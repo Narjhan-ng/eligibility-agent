@@ -12,6 +12,25 @@ This project demonstrates a **production-ready AI agent** that:
 
 **Key Learning**: This is a **GenAI Engineering** project focused on agent orchestration, not machine learning.
 
+### 🆕 NEW: Conversation Memory
+
+Supports **multi-turn dialogues** with conversation memory!
+
+- 💬 **Session-based conversations** - Agent remembers context across messages
+- 💾 **PostgreSQL persistence** - Conversations saved and resumable
+- 🔄 **Chat history loading** - Return to previous conversations
+- 🎨 **Modern chat UI** - Clean, responsive interface at `/chat`
+
+**Example multi-turn conversation:**
+```
+User: "I'm 35 years old, can I get life insurance?"
+Agent: [checks eligibility, finds options]
+
+User: "What about health insurance?"
+Agent: "Since you're 35 years old (from our conversation), let me check..."
+         ↑ Agent remembers age from previous message!
+```
+
 ## 🏗️ Architecture
 
 ```
@@ -41,6 +60,7 @@ Natural language response
 - **LangChain** 0.3.27 - Agent orchestration
 - **Anthropic Claude 3.5 Sonnet** - LLM reasoning
 - **FastAPI** - REST API with interactive frontend
+- **PostgreSQL** 🆕 - Conversation memory persistence
 - **JSON** - Dynamic provider rule storage
 
 ## 📁 Project Structure
@@ -49,9 +69,15 @@ Natural language response
 eligibility-agent/
 ├── app/
 │   ├── main.py               # FastAPI REST API + HTML frontend
-│   ├── agent.py              # Main agent orchestration
+│   ├── agent.py              # Agent orchestration with session support
 │   ├── tools.py              # 7 LangChain tools
-│   └── provider_loader.py    # Dynamic JSON rule loading
+│   ├── provider_loader.py    # Dynamic JSON rule loading
+│   └── session_manager.py    # 🆕 Conversation memory management
+├── database/
+│   ├── schema.sql            # 🆕 PostgreSQL schema for conversations
+│   └── README.md             # 🆕 Database setup guide
+├── static/
+│   └── chat.html             # 🆕 Chat interface with memory
 ├── data/
 │   └── providers/            # Provider rules (JSON)
 │       ├── generali.json
@@ -64,7 +90,7 @@ eligibility-agent/
 │   ├── test_provider_loader.py
 │   ├── test_dynamic_tools.py
 │   └── test_agent.py         # Agent integration tests
-├── .env                      # API keys (not in git)
+├── .env                      # API keys + Database URL (not in git)
 ├── requirements.txt
 └── README.md
 ```
@@ -91,7 +117,36 @@ cp .env.example .env
 ANTHROPIC_API_KEY=sk-ant-api03-xxxxxxxxxxxx
 ```
 
-### 3. Test Tools (No API Key Required)
+### 3. Setup Database (Optional - for conversation memory)
+
+**Required for chat interface with memory:**
+
+```bash
+# Install PostgreSQL (if not already installed)
+# macOS:
+brew install postgresql@15
+brew services start postgresql@15
+
+# Ubuntu/Debian:
+sudo apt-get install postgresql postgresql-contrib
+
+# Create database
+psql postgres
+CREATE DATABASE eligibility_agent;
+\q
+
+# Apply schema
+psql eligibility_agent < database/schema.sql
+
+# Add DATABASE_URL to .env
+echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/eligibility_agent" >> .env
+```
+
+**See [database/README.md](database/README.md) for detailed setup instructions.**
+
+**Note**: Without database, you can still use the original interface at `/` (stateless queries).
+
+### 4. Test Tools (No API Key Required)
 
 ```bash
 # Test individual tools
@@ -129,16 +184,26 @@ python test_agent.py
 ### Web Interface (Easiest)
 
 1. Start server: `uvicorn app.main:app --reload`
-2. Open browser: http://localhost:8000
-3. Use the interactive form or natural language interface
+2. Choose your interface:
+   - **Original Interface**: http://localhost:8000 (stateless queries)
+   - **🆕 Chat Interface**: http://localhost:8000/chat (with conversation memory)
 
 <img src="https://via.placeholder.com/800x400/667eea/ffffff?text=Interactive+Web+Interface" alt="Web Interface" width="100%"/>
 
+#### Original Interface (`/`)
 *Features*:
 - ✅ Structured form for customer profiles
 - ✅ Natural language query interface
 - ✅ Real-time eligibility checking
 - ✅ Beautiful, responsive design
+
+#### 🆕 Chat Interface (`/chat`)
+*Features*:
+- 💬 Multi-turn conversations with memory
+- 🔄 Continue previous conversations
+- 📜 Load conversation history
+- 🎨 Modern chat UI (message bubbles)
+- 💾 Sessions persisted in database
 
 ### REST API Examples
 
@@ -200,6 +265,79 @@ curl http://localhost:8000/api/providers
     ...
   ],
   "total": 4
+}
+```
+
+#### 🆕 Session-based Query (with conversation memory)
+
+**First message (creates session):**
+```bash
+curl -X POST http://localhost:8000/api/v2/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "I am 35 years old, can I get life insurance?"
+  }'
+```
+
+**Response:**
+```json
+{
+  "answer": "Yes! At 35 years old, you're eligible for life insurance...",
+  "session_key": "550e8400-e29b-41d4-a716-446655440000",
+  "session_id": "abc123",
+  "message_count": 2,
+  "is_new_session": true
+}
+```
+
+**Follow-up message (agent remembers context!):**
+```bash
+curl -X POST http://localhost:8000/api/v2/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What about health insurance?",
+    "session_key": "550e8400-e29b-41d4-a716-446655440000"
+  }'
+```
+
+**Response:**
+```json
+{
+  "answer": "Since you're 35 years old (from our previous conversation), let me check health insurance eligibility...",
+  "session_key": "550e8400-e29b-41d4-a716-446655440000",
+  "session_id": "abc123",
+  "message_count": 4,
+  "is_new_session": false
+}
+```
+
+#### 🆕 Load Conversation History
+
+```bash
+curl http://localhost:8000/api/v2/conversation/550e8400-e29b-41d4-a716-446655440000
+```
+
+**Response:**
+```json
+{
+  "session_id": "abc123",
+  "messages": [
+    {
+      "role": "user",
+      "content": "I am 35 years old, can I get life insurance?",
+      "created_at": "2024-10-16T21:00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes! At 35 years old...",
+      "created_at": "2024-10-16T21:00:05"
+    },
+    ...
+  ],
+  "session_info": {
+    "message_count": 4,
+    "status": "active"
+  }
 }
 ```
 
