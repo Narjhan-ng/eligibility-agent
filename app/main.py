@@ -129,6 +129,48 @@ class InteractiveQuery(BaseModel):
         description="Previous conversation history for context"
     )
 
+# === DAY 6: SESSION-BASED CONVERSATION MODELS ===
+
+class SessionQuery(BaseModel):
+    """
+    Model for session-based queries with conversation memory.
+
+    This is the NEW way to interact with the agent (Day 6).
+    """
+    question: str = Field(
+        ...,
+        description="User's question",
+        example="Can I get life insurance?"
+    )
+    session_key: Optional[str] = Field(
+        default=None,
+        description="Session key for continuing a conversation (optional, will create new if not provided)",
+        example="550e8400-e29b-41d4-a716-446655440000"
+    )
+    user_identifier: Optional[str] = Field(
+        default=None,
+        description="Optional user identifier (email, user_id, etc.)",
+        example="user@example.com"
+    )
+    customer_profile: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Optional customer profile data to store with session"
+    )
+
+class SessionQueryResponse(BaseModel):
+    """Response model for session-based queries"""
+    answer: str = Field(description="Agent's response")
+    session_key: str = Field(description="Session key (store this in browser)")
+    session_id: str = Field(description="Internal session ID")
+    message_count: int = Field(description="Total messages in this session")
+    is_new_session: bool = Field(description="Whether this is a new session")
+
+class ConversationHistoryResponse(BaseModel):
+    """Response model for conversation history"""
+    session_id: str
+    messages: List[Dict[str, Any]]
+    session_info: Optional[Dict[str, Any]]
+
 class HealthCheckResponse(BaseModel):
     """Health check response model"""
     status: str
@@ -925,6 +967,181 @@ async def list_providers():
         ],
         "total": 4
     }
+
+# === DAY 6: NEW ENDPOINTS FOR SESSION-BASED CONVERSATIONS ===
+
+@app.post("/api/v2/query", response_model=SessionQueryResponse)
+async def query_with_session(query: SessionQuery):
+    """
+    Query the agent with session-based conversation memory (Day 6 enhancement).
+
+    This endpoint enables multi-turn dialogues where the agent remembers
+    previous context within a session.
+
+    === HOW IT WORKS ===
+
+    1. First request (no session_key): Creates new session
+    2. Subsequent requests (with session_key): Continues conversation
+    3. Agent has full context from previous messages
+
+    === EXAMPLE FLOW ===
+
+    ```javascript
+    // First question
+    response1 = await fetch('/api/v2/query', {
+        method: 'POST',
+        body: JSON.stringify({
+            question: "I'm 35 years old, can I get life insurance?"
+        })
+    });
+    // Response includes session_key, store it!
+
+    // Follow-up question (agent remembers age!)
+    response2 = await fetch('/api/v2/query', {
+        method: 'POST',
+        body: JSON.stringify({
+            question: "What about health insurance?",
+            session_key: session_key_from_response1
+        })
+    });
+    ```
+
+    Args:
+        query: SessionQuery object with question and optional session_key
+
+    Returns:
+        SessionQueryResponse with answer and session info
+
+    Raises:
+        HTTPException: If agent is not initialized or query fails
+    """
+    if not agent:
+        raise HTTPException(
+            status_code=503,
+            detail="Agent not initialized. Check ANTHROPIC_API_KEY configuration."
+        )
+
+    try:
+        # Step 1: Check if continuing existing session or creating new one
+        session_id = None
+        session_key = query.session_key
+        is_new_session = False
+
+        if session_key:
+            # Try to find existing session
+            session = agent.get_session_by_key(session_key)
+
+            if session:
+                session_id = session['id']
+                print(f"✓ Continuing session: {session_id}")
+            else:
+                # Session expired or not found, create new one
+                print(f"✗ Session not found or expired: {session_key}")
+                session_key = None  # Will create new below
+
+        if not session_key:
+            # Create new session
+            session_id, session_key = agent.create_session(
+                user_identifier=query.user_identifier,
+                customer_profile=query.customer_profile,
+                initial_query=query.question
+            )
+            is_new_session = True
+            print(f"✓ Created new session: {session_id}")
+
+        # Step 2: Query agent with session context
+        result = agent.query_with_session(
+            question=query.question,
+            session_id=session_id,
+            save_to_db=True
+        )
+
+        # Step 3: Return response with session info
+        return SessionQueryResponse(
+            answer=result["output"],
+            session_key=session_key,
+            session_id=session_id,
+            message_count=result.get("message_count", 2),
+            is_new_session=is_new_session
+        )
+
+    except Exception as e:
+        print(f"Error in query_with_session: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Query failed: {str(e)}"
+        )
+
+
+@app.get("/api/v2/conversation/{session_key}", response_model=ConversationHistoryResponse)
+async def get_conversation_history(session_key: str):
+    """
+    Get conversation history for a session.
+
+    Useful for:
+    - Loading conversation when user returns
+    - Displaying chat history in UI
+    - Debugging and support
+
+    Args:
+        session_key: Session key from client
+
+    Returns:
+        ConversationHistoryResponse with messages and session info
+
+    Raises:
+        HTTPException: If session not found or error occurs
+    """
+    if not agent:
+        raise HTTPException(
+            status_code=503,
+            detail="Agent not initialized"
+        )
+
+    try:
+        # Get session
+        session = agent.get_session_by_key(session_key)
+
+        if not session:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Session not found or expired: {session_key}"
+            )
+
+        # Get messages
+        messages = agent.get_conversation_messages(session['id'])
+
+        # Format messages for response
+        formatted_messages = []
+        for msg in messages:
+            formatted_messages.append({
+                "role": msg["role"],
+                "content": msg["content"],
+                "created_at": msg["created_at"].isoformat() if msg.get("created_at") else None
+            })
+
+        return ConversationHistoryResponse(
+            session_id=str(session['id']),
+            messages=formatted_messages,
+            session_info={
+                "session_key": session_key,
+                "created_at": session["created_at"].isoformat() if session.get("created_at") else None,
+                "status": session.get("status", "unknown"),
+                "message_count": len(formatted_messages)
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting conversation history: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get conversation history: {str(e)}"
+        )
 
 # === STARTUP EVENT ===
 @app.on_event("startup")
