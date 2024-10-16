@@ -63,9 +63,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# === MOUNT STATIC FILES (if we add CSS/JS later) ===
-# Uncomment when adding static assets
-# app.mount("/static", StaticFiles(directory="static"), name="static")
+# === MOUNT STATIC FILES ===
+# Day 6: Mount static directory for chat.html
+import os
+static_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+if os.path.exists(static_path):
+    app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 # === INITIALIZE AGENT ===
 # Create agent instance on startup
@@ -178,6 +181,22 @@ class HealthCheckResponse(BaseModel):
     message: str
 
 # === API ENDPOINTS ===
+
+@app.get("/chat", response_class=HTMLResponse)
+async def chat_interface():
+    """
+    NEW Chat interface with conversation memory (Day 6).
+
+    Features:
+    - Multi-turn dialogues with context memory
+    - Session persistence across page reloads
+    - Chat history loading
+    - Modern chat UI
+
+    This demonstrates the new /api/v2/query endpoint with session management.
+    """
+    with open(os.path.join(static_path, "chat.html"), 'r', encoding='utf-8') as f:
+        return f.read()
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
@@ -449,6 +468,8 @@ async def home():
             <div class="info">
                 <strong>✓ AI Agent Ready!</strong> Powered by LangChain and Claude 3.5 Sonnet.
                 Ask questions or fill the form to check eligibility across 4 Italian providers.
+                <br><br>
+                <strong>🆕 NEW!</strong> Try the <a href="/chat" style="color: #667eea; font-weight: bold;">Chat Interface</a> with conversation memory (Day 6 feature)!
             </div>
 
             <!-- === TAB NAVIGATION === -->
