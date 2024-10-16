@@ -13,6 +13,9 @@ langchain-community>=0.3.0
 python-dotenv==1.0.0
 httpx>=0.25.0
 
+# === Database (Day 6: Conversation Memory) ===
+psycopg2-binary>=2.9.9
+
 # === Testing ===
 pytest>=8.0.0
 pytest-asyncio>=1.0.0

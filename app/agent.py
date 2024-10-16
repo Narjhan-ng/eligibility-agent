@@ -37,7 +37,7 @@ This is the CORE of GenAI Engineering!
 """
 
 import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from dotenv import load_dotenv
 
 # === LANGCHAIN IMPORTS ===
@@ -63,6 +63,10 @@ from app.tools import (
     update_provider_rules
 )
 
+# === DAY 6 ADDITION: Session Manager for Conversation Memory ===
+# Import the SessionManager to enable multi-turn conversations
+from app.session_manager import SessionManager
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -83,18 +87,28 @@ class EligibilityAgent:
 
     Using a class allows us to:
     - Initialize once, use many times (efficiency)
-    - Maintain conversation state (future enhancement)
+    - Maintain conversation state (Day 6: NOW IMPLEMENTED!)
     - Easy to test and mock
     - Clean API for external use
+
+    === DAY 6 ENHANCEMENT: CONVERSATION MEMORY ===
+
+    Now supports multi-turn dialogues with:
+    - Session-based conversation tracking
+    - Persistent message history
+    - Context awareness across requests
+    - Automatic session management
     """
 
-    def __init__(self, verbose: bool = True):
+    def __init__(self, verbose: bool = True, session_manager: Optional[SessionManager] = None):
         """
         Initialize the agent with LLM and tools.
 
         Args:
             verbose: If True, prints agent's reasoning process
                     (useful for debugging and learning)
+            session_manager: Optional SessionManager instance for conversation memory
+                           If None, creates a new one (Day 6 addition)
 
         === INITIALIZATION STEPS ===
         1. Create LLM instance (Claude)
@@ -102,7 +116,12 @@ class EligibilityAgent:
         3. Create system prompt
         4. Build agent
         5. Wrap in executor
+        6. (Day 6) Initialize session manager for memory
         """
+
+        # === DAY 6: Initialize Session Manager ===
+        # Session manager handles conversation memory and persistence
+        self.session_manager = session_manager or SessionManager()
         # === STEP 1: Initialize the LLM ===
         # Claude 3.5 Sonnet is the "brain" of the agent
         # It decides which tools to call and interprets results
@@ -339,6 +358,196 @@ so your information is always current and accurate.
             List of tool names
         """
         return [tool.name for tool in self.tools]
+
+    # === DAY 6: NEW METHODS FOR SESSION-BASED CONVERSATIONS ===
+
+    def query_with_session(
+        self,
+        question: str,
+        session_id: str,
+        save_to_db: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Ask a question with session-based conversation memory.
+
+        This is the NEW way to interact with the agent (Day 6).
+
+        Args:
+            question: User's question
+            session_id: Session UUID for conversation tracking
+            save_to_db: Whether to persist messages (default True)
+
+        Returns:
+            Dict with:
+                - output: Agent's response
+                - session_id: Session UUID
+                - message_count: Total messages in session
+
+        === HOW IT WORKS ===
+
+        1. Load conversation history from database
+        2. Pass history to agent (gives context)
+        3. Agent responds with full context awareness
+        4. Save user message and agent response to database
+
+        === EXAMPLE ===
+
+        ```python
+        # First question
+        result = agent.query_with_session(
+            question="I'm 35 years old, can I get life insurance?",
+            session_id="abc-123"
+        )
+        # Agent checks eligibility
+
+        # Follow-up question (agent remembers context!)
+        result = agent.query_with_session(
+            question="What about health insurance?",
+            session_id="abc-123"  # Same session
+        )
+        # Agent remembers user is 35, checks health insurance
+        ```
+
+        === WHY THIS IS POWERFUL ===
+
+        Without sessions:
+        User: "What about health insurance?"
+        Agent: "I need more information. How old are you?"
+
+        With sessions:
+        User: "What about health insurance?"
+        Agent: "Since you're 35 years old (from our previous conversation),
+                let me check health insurance eligibility..."
+        """
+
+        # Step 1: Load conversation history from database
+        chat_history = self.session_manager.get_conversation_history(
+            session_id=session_id,
+            include_tool_messages=False  # Don't include tool calls in history (too verbose)
+        )
+
+        # Step 2: Save user message to database (before agent responds)
+        if save_to_db:
+            self.session_manager.add_message(
+                session_id=session_id,
+                role="user",
+                content=question
+            )
+
+        # Step 3: Invoke agent with conversation history
+        result = self.agent_executor.invoke({
+            "input": question,
+            "chat_history": chat_history  # Agent now has full context!
+        })
+
+        # Step 4: Save agent response to database
+        if save_to_db:
+            self.session_manager.add_message(
+                session_id=session_id,
+                role="assistant",
+                content=result["output"]
+            )
+
+            # Extend session expiry (user is active)
+            self.session_manager.extend_session_expiry(session_id, hours=24)
+
+        # Step 5: Return structured response
+        return {
+            "output": result["output"],
+            "session_id": session_id,
+            "message_count": len(chat_history) + 2  # +2 for current exchange
+        }
+
+    def create_session(
+        self,
+        user_identifier: Optional[str] = None,
+        customer_profile: Optional[Dict[str, Any]] = None,
+        initial_query: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Tuple[str, str]:
+        """
+        Create a new conversation session.
+
+        Args:
+            user_identifier: Optional user ID/email
+            customer_profile: Optional customer data
+            initial_query: Optional first question
+            metadata: Optional metadata (user_agent, ip, etc.)
+
+        Returns:
+            Tuple of (session_id, session_key)
+
+        === USAGE ===
+
+        ```python
+        # Create session when user starts conversation
+        session_id, session_key = agent.create_session(
+            user_identifier="user@example.com",
+            customer_profile={"age": 35, "occupation": "engineer"}
+        )
+
+        # Return session_key to client (store in browser)
+        # Client sends session_key with each request
+        ```
+        """
+        return self.session_manager.create_session(
+            user_identifier=user_identifier,
+            customer_profile=customer_profile,
+            initial_query=initial_query,
+            metadata=metadata
+        )
+
+    def get_session_by_key(self, session_key: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve session by client-facing session key.
+
+        Args:
+            session_key: Session key from client
+
+        Returns:
+            Session dict or None if not found/expired
+
+        === TYPICAL API FLOW ===
+
+        ```python
+        # Client sends session_key
+        session = agent.get_session_by_key(session_key)
+
+        if session:
+            # Continue existing conversation
+            session_id = session['id']
+        else:
+            # Create new session
+            session_id, session_key = agent.create_session()
+        ```
+        """
+        return self.session_manager.get_session_by_key(session_key)
+
+    def get_conversation_messages(
+        self,
+        session_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all messages for a session (for display in UI).
+
+        Args:
+            session_id: Session UUID
+
+        Returns:
+            List of message dicts with role, content, timestamp
+
+        === USAGE ===
+
+        ```python
+        # Load conversation history for UI
+        messages = agent.get_conversation_messages(session_id)
+
+        # Display in chat interface
+        for msg in messages:
+            print(f"{msg['role']}: {msg['content']}")
+        ```
+        """
+        return self.session_manager.get_messages(session_id)
 
 
 # === CONVENIENCE FUNCTION ===
