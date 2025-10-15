@@ -1,0 +1,40 @@
+{
+  "provider_name": "UnipolSai",
+  "provider_code": "unipolsai",
+  "country": "IT",
+  "last_updated": "2025-10-15",
+  "products": {
+    "life": {
+      "available": true,
+      "age_min": 18,
+      "age_max": 65,
+      "max_risk": "medium",
+      "base_premium": 55.0,
+      "description": "Life insurance with flexible terms"
+    },
+    "auto": {
+      "available": true,
+      "age_min": 21,
+      "age_max": 75,
+      "max_risk": "high",
+      "base_premium": 75.0,
+      "description": "Auto insurance with roadside assistance"
+    },
+    "home": {
+      "available": true,
+      "age_min": 18,
+      "age_max": 80,
+      "max_risk": "high",
+      "base_premium": 65.0,
+      "description": "Home insurance with theft protection"
+    },
+    "health": {
+      "available": true,
+      "age_min": 18,
+      "age_max": 60,
+      "max_risk": "medium",
+      "base_premium": 95.0,
+      "description": "Health insurance with dental coverage"
+    }
+  }
+}

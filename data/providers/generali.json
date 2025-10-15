@@ -1,0 +1,40 @@
+{
+  "provider_name": "Generali",
+  "provider_code": "generali",
+  "country": "IT",
+  "last_updated": "2025-10-15",
+  "products": {
+    "life": {
+      "available": true,
+      "age_min": 18,
+      "age_max": 70,
+      "max_risk": "high",
+      "base_premium": 50.0,
+      "description": "Life insurance with comprehensive coverage"
+    },
+    "auto": {
+      "available": true,
+      "age_min": 18,
+      "age_max": 75,
+      "max_risk": "high",
+      "base_premium": 80.0,
+      "description": "Auto insurance for all vehicle types"
+    },
+    "home": {
+      "available": true,
+      "age_min": 18,
+      "age_max": 80,
+      "max_risk": "high",
+      "base_premium": 60.0,
+      "description": "Home insurance covering property and contents"
+    },
+    "health": {
+      "available": true,
+      "age_min": 18,
+      "age_max": 65,
+      "max_risk": "medium",
+      "base_premium": 100.0,
+      "description": "Health insurance with hospital coverage"
+    }
+  }
+}

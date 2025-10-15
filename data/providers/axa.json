@@ -1,0 +1,40 @@
+{
+  "provider_name": "AXA",
+  "provider_code": "axa",
+  "country": "IT",
+  "last_updated": "2025-10-15",
+  "products": {
+    "life": {
+      "available": true,
+      "age_min": 18,
+      "age_max": 72,
+      "max_risk": "medium",
+      "base_premium": 48.0,
+      "description": "Flexible life insurance plans"
+    },
+    "auto": {
+      "available": true,
+      "age_min": 20,
+      "age_max": 75,
+      "max_risk": "high",
+      "base_premium": 78.0,
+      "description": "Auto insurance with accident forgiveness"
+    },
+    "home": {
+      "available": true,
+      "age_min": 18,
+      "age_max": 80,
+      "max_risk": "high",
+      "base_premium": 62.0,
+      "description": "Comprehensive home insurance"
+    },
+    "health": {
+      "available": true,
+      "age_min": 18,
+      "age_max": 67,
+      "max_risk": "medium",
+      "base_premium": 98.0,
+      "description": "Health insurance with wellness programs"
+    }
+  }
+}

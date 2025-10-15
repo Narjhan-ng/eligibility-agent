@@ -1,0 +1,40 @@
+{
+  "provider_name": "Allianz",
+  "provider_code": "allianz",
+  "country": "IT",
+  "last_updated": "2025-10-15",
+  "products": {
+    "life": {
+      "available": true,
+      "age_min": 21,
+      "age_max": 68,
+      "max_risk": "medium",
+      "base_premium": 52.0,
+      "description": "Life insurance with investment options"
+    },
+    "auto": {
+      "available": true,
+      "age_min": 23,
+      "age_max": 75,
+      "max_risk": "high",
+      "base_premium": 85.0,
+      "description": "Premium auto insurance"
+    },
+    "home": {
+      "available": true,
+      "age_min": 18,
+      "age_max": 75,
+      "max_risk": "high",
+      "base_premium": 70.0,
+      "description": "Home insurance with natural disaster coverage"
+    },
+    "health": {
+      "available": true,
+      "age_min": 21,
+      "age_max": 65,
+      "max_risk": "medium",
+      "base_premium": 105.0,
+      "description": "Premium health insurance"
+    }
+  }
+}
