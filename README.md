@@ -40,14 +40,15 @@ Natural language response
 - **Python 3.11**
 - **LangChain** 0.3.27 - Agent orchestration
 - **Anthropic Claude 3.5 Sonnet** - LLM reasoning
+- **FastAPI** - REST API with interactive frontend
 - **JSON** - Dynamic provider rule storage
-- **FastAPI** (planned) - REST API
 
 ## 📁 Project Structure
 
 ```
 eligibility-agent/
 ├── app/
+│   ├── main.py               # FastAPI REST API + HTML frontend
 │   ├── agent.py              # Main agent orchestration
 │   ├── tools.py              # 7 LangChain tools
 │   └── provider_loader.py    # Dynamic JSON rule loading
@@ -58,6 +59,7 @@ eligibility-agent/
 │       ├── allianz.json
 │       └── axa.json
 ├── tests/
+│   ├── test_api.py           # API integration tests (13 tests)
 │   ├── test_tools.py         # Unit tests for tools
 │   ├── test_provider_loader.py
 │   ├── test_dynamic_tools.py
@@ -102,13 +104,119 @@ python test_provider_loader.py
 python test_dynamic_tools.py
 ```
 
-### 4. Test Agent (Requires API Key)
+### 4. Run FastAPI Server
 
 ```bash
+# Start the development server
+uvicorn app.main:app --reload --port 8000
+
+# Open browser at: http://localhost:8000
+# API docs at: http://localhost:8000/docs
+```
+
+### 5. Run Tests
+
+```bash
+# Run all API tests (mocked, no API key needed)
+pytest tests/test_api.py -v
+
+# Run agent tests (requires API key)
 python test_agent.py
 ```
 
 ## 💡 Usage Examples
+
+### Web Interface (Easiest)
+
+1. Start server: `uvicorn app.main:app --reload`
+2. Open browser: http://localhost:8000
+3. Use the interactive form or natural language interface
+
+<img src="https://via.placeholder.com/800x400/667eea/ffffff?text=Interactive+Web+Interface" alt="Web Interface" width="100%"/>
+
+*Features*:
+- ✅ Structured form for customer profiles
+- ✅ Natural language query interface
+- ✅ Real-time eligibility checking
+- ✅ Beautiful, responsive design
+
+### REST API Examples
+
+#### Check Eligibility (Structured)
+
+```bash
+curl -X POST http://localhost:8000/api/check-eligibility \
+  -H "Content-Type: application/json" \
+  -d '{
+    "birth_date": "1985-05-15",
+    "health_conditions": ["diabetes"],
+    "occupation": "software engineer",
+    "insurance_type": "life"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "analysis": "Based on the customer profile (40 years old, software engineer, with diabetes), here's the eligibility analysis:\n\n✓ Generali: Eligible - Premium €75/month\n✓ AXA: Eligible - Premium €80/month\n✗ UnipolSai: Not eligible (health conditions)\n..."
+}
+```
+
+#### Natural Language Query
+
+```bash
+curl -X POST http://localhost:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Can a 35-year-old teacher get auto insurance? Compare all providers."
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "answer": "Yes, a 35-year-old teacher can get auto insurance from all 4 providers. Here's the comparison:\n\n1. Generali: €45/month (low risk)\n2. AXA: €50/month\n3. UnipolSai: €48/month\n4. Allianz: €47/month\n\nBest option: Generali at €45/month"
+}
+```
+
+#### List Available Providers
+
+```bash
+curl http://localhost:8000/api/providers
+```
+
+**Response:**
+```json
+{
+  "providers": [
+    {
+      "code": "generali",
+      "name": "Generali",
+      "country": "IT",
+      "products": ["life", "auto", "home", "health"]
+    },
+    ...
+  ],
+  "total": 4
+}
+```
+
+#### Health Check
+
+```bash
+curl http://localhost:8000/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "agent_ready": true,
+  "message": "Agent is ready"
+}
+```
 
 ### Python API
 
@@ -185,13 +293,29 @@ Provider rules are stored in `data/providers/*.json`:
 
 ## 🧪 Testing
 
+**Test Coverage**: 13/13 API integration tests passing ✅
+
 ```bash
-# Test all components
+# API integration tests (mocked, no API key required)
+pytest tests/test_api.py -v
+# Tests: health check, providers, eligibility, queries, error handling, CORS
+
+# Unit tests (no API key required)
 python test_tools.py              # Test individual tools
 python test_provider_loader.py    # Test JSON loading
 python test_dynamic_tools.py      # Test dynamic features
-python test_agent.py              # Test full agent (requires API key)
+
+# E2E tests (requires API key)
+python test_agent.py              # Test full agent with real LLM calls
 ```
+
+**What's tested:**
+- ✅ FastAPI endpoints (POST/GET)
+- ✅ Request validation (Pydantic models)
+- ✅ Error handling (4xx, 5xx)
+- ✅ Tool execution (calculate_age, assess_risk, etc.)
+- ✅ Provider data loading (JSON)
+- ✅ Agent orchestration (LangChain + Claude)
 
 ## 🎓 Learning Outcomes
 
@@ -216,7 +340,9 @@ This project demonstrates:
 
 ## 🚧 Future Enhancements
 
-- [ ] FastAPI REST API
+- [x] FastAPI REST API ✅
+- [x] Interactive HTML frontend ✅
+- [x] Comprehensive testing suite ✅
 - [ ] Conversation memory (multi-turn dialogues)
 - [ ] Database integration (PostgreSQL)
 - [ ] Provider API integration (real-time rules)
