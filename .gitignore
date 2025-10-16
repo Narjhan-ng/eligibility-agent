@@ -46,3 +46,6 @@ data/*.tmp
 
 # Logs
 *.log
+
+#Docs
+docs/
