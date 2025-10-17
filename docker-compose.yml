@@ -1,0 +1,121 @@
+# ==============================================================================
+# Docker Compose Configuration for Insurance Eligibility Agent
+# ==============================================================================
+# This file orchestrates multiple services:
+# 1. PostgreSQL database for conversation memory
+# 2. FastAPI application (Insurance Eligibility Agent)
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # PostgreSQL Database Service
+  # ----------------------------------------------------------------------------
+  # Stores conversation history and session data
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: eligibility-agent-db
+    restart: unless-stopped
+
+    # Environment variables for PostgreSQL configuration
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-eligibility_agent}
+      # Performance tuning
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.UTF-8"
+
+    # Persist database data using a named volume
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Optional: Add initialization scripts
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    # Expose PostgreSQL port (only to other containers by default)
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+    # Health check to ensure database is ready
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    # Network configuration
+    networks:
+      - app-network
+
+  # ----------------------------------------------------------------------------
+  # FastAPI Application Service
+  # ----------------------------------------------------------------------------
+  # Main application container running the Insurance Eligibility Agent
+  # ----------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eligibility-agent-app
+    restart: unless-stopped
+
+    # Environment variables for the application
+    # These can be overridden by creating a .env file
+    environment:
+      # Anthropic API Configuration
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+
+      # Database Configuration
+      # Note: 'postgres' is the service name, used as hostname within Docker network
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-eligibility_agent}
+
+      # Application Configuration
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+
+    # Expose application port
+    ports:
+      - "${APP_PORT:-8000}:8000"
+
+    # Wait for PostgreSQL to be healthy before starting
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    # Health check for the application
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Network configuration
+    networks:
+      - app-network
+
+    # Optional: Mount code for development (hot reload)
+    # Uncomment the following lines for development mode:
+    # volumes:
+    #   - ./app:/app/app
+    #   - ./static:/app/static
+    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# ------------------------------------------------------------------------------
+# Networks
+# ------------------------------------------------------------------------------
+# Create an isolated network for the application services
+# ------------------------------------------------------------------------------
+networks:
+  app-network:
+    driver: bridge
+    name: eligibility-agent-network
+
+# ------------------------------------------------------------------------------
+# Volumes
+# ------------------------------------------------------------------------------
+# Named volumes for persistent data storage
+# ------------------------------------------------------------------------------
+volumes:
+  postgres_data:
+    name: eligibility-agent-postgres-data
+    driver: local

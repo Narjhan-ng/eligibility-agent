@@ -47,5 +47,10 @@ data/*.tmp
 # Logs
 *.log
 
-#Docs
+# Docker
+.env.docker
+*.tar
+docker-compose.override.yml
+
+# Docs
 docs/

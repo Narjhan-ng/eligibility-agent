@@ -61,6 +61,7 @@ Natural language response
 - **Anthropic Claude 3.5 Sonnet** - LLM reasoning
 - **FastAPI** - REST API with interactive frontend
 - **PostgreSQL** 🆕 - Conversation memory persistence
+- **Docker & Docker Compose** 🆕 - Containerized deployment
 - **JSON** - Dynamic provider rule storage
 
 ## 📁 Project Structure
@@ -90,12 +91,44 @@ eligibility-agent/
 │   ├── test_provider_loader.py
 │   ├── test_dynamic_tools.py
 │   └── test_agent.py         # Agent integration tests
+├── Dockerfile                # 🆕 Multi-stage Docker build
+├── docker-compose.yml        # 🆕 App + PostgreSQL orchestration
+├── .dockerignore             # 🆕 Docker build exclusions
+├── docker-run.sh             # 🆕 Helper script for Docker
+├── DOCKER.md                 # 🆕 Docker deployment guide
 ├── .env                      # API keys + Database URL (not in git)
 ├── requirements.txt
 └── README.md
 ```
 
-## 🚀 Setup
+## 🐳 Quick Start with Docker (Recommended)
+
+The fastest way to run the application:
+
+```bash
+# 1. Create environment file
+cp .env.docker.example .env
+# Edit .env and add your ANTHROPIC_API_KEY
+
+# 2. Start with helper script
+./docker-run.sh start
+
+# OR use docker-compose directly
+docker-compose up -d
+```
+
+**Access the application:**
+- Web Interface: http://localhost:8000
+- Chat Interface: http://localhost:8000/chat
+- API Documentation: http://localhost:8000/docs
+
+**View logs:** `./docker-run.sh logs`
+
+See [DOCKER.md](DOCKER.md) for detailed Docker documentation.
+
+---
+
+## 🚀 Manual Setup (Alternative)
 
 ### 1. Clone & Install
 
@@ -493,14 +526,6 @@ This project demonstrates:
 
 MIT
 
-## 👤 Author
-
-**Nicola Gnasso**
-- Learning project for AI Engineering portfolio
-- Part of 6-8 week intensive AI Engineer roadmap
-- Goal: €45-55k AI Engineer position
-
 ---
 
-**Built with**: LangChain, Claude, Python 3.11
-**Learning Focus**: Agent orchestration, production patterns, tool design
+**Built with**: Python 3.11 • LangChain 0.3.27 • Claude 3.5 Sonnet • FastAPI • PostgreSQL 15 • Docker
